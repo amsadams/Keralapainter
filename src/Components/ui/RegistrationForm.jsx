@@ -1,13 +1,14 @@
-
 import React, { useState } from 'react';
 import { User, MapPin, Phone, MessageCircle, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
-import { supabase } from '../../lib/supabase'; // Adjust path as needed
+import { supabase } from '../../lib/supabase';
+import { KERALA_LOCAL_BODIES } from '../../data/keralaLocalBodies'; // Import the data
 
 const RegistrationForm = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     district: '',
+    localBodyType: '', // 'panchayath', 'municipality', 'corporation'
     localBody: '',
     phoneNumber: '',
     whatsappNumber: ''
@@ -17,16 +18,34 @@ const RegistrationForm = () => {
   const [submitStatus, setSubmitStatus] = useState(null); // 'success', 'error', null
 
   const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    
+    // Reset dependent fields when parent field changes
+    if (name === 'district') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        localBodyType: '',
+        localBody: ''
+      });
+    } else if (name === 'localBodyType') {
+      setFormData({
+        ...formData,
+        [name]: value,
+        localBody: ''
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
   };
 
   const validateForm = () => {
-    const { firstName, lastName, district, localBody, phoneNumber, whatsappNumber } = formData;
+    const { firstName, lastName, district, localBodyType, localBody, phoneNumber, whatsappNumber } = formData;
     
-    if (!firstName.trim() || !lastName.trim() || !district || !localBody.trim() || !phoneNumber.trim() || !whatsappNumber.trim()) {
+    if (!firstName.trim() || !lastName.trim() || !district || !localBodyType || !localBody.trim() || !phoneNumber.trim() || !whatsappNumber.trim()) {
       return 'All fields are required';
     }
     
@@ -64,6 +83,7 @@ const RegistrationForm = () => {
             first_name: formData.firstName.trim(),
             last_name: formData.lastName.trim(),
             district: formData.district,
+            local_body_type: formData.localBodyType,
             local_body: formData.localBody.trim(),
             phone_number: formData.phoneNumber.trim(),
             whatsapp_number: formData.whatsappNumber.trim()
@@ -83,6 +103,7 @@ const RegistrationForm = () => {
         firstName: '',
         lastName: '',
         district: '',
+        localBodyType: '',
         localBody: '',
         phoneNumber: '',
         whatsappNumber: ''
@@ -96,11 +117,40 @@ const RegistrationForm = () => {
     }
   };
 
-  const districts = [
-    'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha', 'Kottayam',
-    'Idukki', 'Ernakulam', 'Thrissur', 'Palakkad', 'Malappuram',
-    'Kozhikode', 'Wayanad', 'Kannur', 'Kasaragod'
-  ];
+  // Get available districts
+  const districts = Object.keys(KERALA_LOCAL_BODIES).sort();
+
+  // Get available local body types for selected district
+  const getAvailableLocalBodyTypes = () => {
+    if (!formData.district || !KERALA_LOCAL_BODIES[formData.district]) return [];
+    
+    const districtData = KERALA_LOCAL_BODIES[formData.district];
+    const types = [];
+    
+    if (districtData.panchayaths.length > 0) types.push({ value: 'panchayath', label: 'Panchayath' });
+    if (districtData.municipalities.length > 0) types.push({ value: 'municipality', label: 'Municipality' });
+    if (districtData.corporations.length > 0) types.push({ value: 'corporation', label: 'Corporation' });
+    
+    return types;
+  };
+
+  // Get available local bodies for selected district and type
+  const getAvailableLocalBodies = () => {
+    if (!formData.district || !formData.localBodyType || !KERALA_LOCAL_BODIES[formData.district]) return [];
+    
+    const districtData = KERALA_LOCAL_BODIES[formData.district];
+    
+    switch (formData.localBodyType) {
+      case 'panchayath':
+        return districtData.panchayaths;
+      case 'municipality':
+        return districtData.municipalities;
+      case 'corporation':
+        return districtData.corporations;
+      default:
+        return [];
+    }
+  };
 
   return (
     <div className="relative bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 p-8 sm:p-12 shadow-2xl max-w-2xl mx-auto">
@@ -165,7 +215,7 @@ const RegistrationForm = () => {
             </div>
           </div>
 
-          {/* District */}
+          {/* District Selection */}
           <div>
             <label className="flex items-center text-white/80 text-sm font-medium mb-2">
               <MapPin className="w-4 h-4 text-emerald-300 mr-2" />
@@ -188,22 +238,57 @@ const RegistrationForm = () => {
             </select>
           </div>
 
-          {/* Local Body */}
-          <div>
-            <label className="block text-white/80 text-sm font-medium mb-2">
-              Panchayat / Municipality / Corporation *
-            </label>
-            <input
-              type="text"
-              name="localBody"
-              value={formData.localBody}
-              onChange={handleInputChange}
-              required
-              disabled={isSubmitting}
-              className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-              placeholder="Enter your local body name"
-            />
-          </div>
+          {/* Local Body Type Selection */}
+          {formData.district && (
+            <div>
+              <label className="block text-white/80 text-sm font-medium mb-2">
+                Local Body Type *
+              </label>
+              <select
+                name="localBodyType"
+                value={formData.localBodyType}
+                onChange={handleInputChange}
+                required
+                disabled={isSubmitting}
+                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+              >
+                <option value="" className="bg-gray-800 text-white">Select Local Body Type</option>
+                {getAvailableLocalBodyTypes().map((type) => (
+                  <option key={type.value} value={type.value} className="bg-gray-800 text-white">
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Local Body Selection */}
+          {formData.district && formData.localBodyType && (
+            <div>
+              <label className="block text-white/80 text-sm font-medium mb-2">
+                {formData.localBodyType === 'panchayath' ? 'Panchayath' : 
+                 formData.localBodyType === 'municipality' ? 'Municipality' : 'Corporation'} *
+              </label>
+              <select
+                name="localBody"
+                value={formData.localBody}
+                onChange={handleInputChange}
+                required
+                disabled={isSubmitting}
+                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+              >
+                <option value="" className="bg-gray-800 text-white">
+                  Select {formData.localBodyType === 'panchayath' ? 'Panchayath' : 
+                           formData.localBodyType === 'municipality' ? 'Municipality' : 'Corporation'}
+                </option>
+                {getAvailableLocalBodies().map((localBody) => (
+                  <option key={localBody} value={localBody} className="bg-gray-800 text-white">
+                    {localBody}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Contact Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -279,4 +364,5 @@ const RegistrationForm = () => {
     </div>
   );
 };
+
 export default RegistrationForm;
