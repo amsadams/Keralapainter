@@ -13,13 +13,15 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Building,
+  Home,
+  Landmark
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-
 import ViewDetailsModal from './ViewDetailsModal';
 
-const AdminDashboard = () => {
+const EnhancedAdminDashboard = () => {
   // Main state management
   const [registrations, setRegistrations] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -29,6 +31,7 @@ const AdminDashboard = () => {
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedLocalBodyType, setSelectedLocalBodyType] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
   // Pagination states
@@ -45,6 +48,10 @@ const AdminDashboard = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Modal states
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedRegistration, setSelectedRegistration] = useState(null);
+
   // Kerala districts for dropdown
   const districts = [
     'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha', 'Kottayam',
@@ -52,12 +59,15 @@ const AdminDashboard = () => {
     'Kozhikode', 'Wayanad', 'Kannur', 'Kasaragod'
   ];
 
-
+  const localBodyTypes = [
+    { value: 'panchayath', label: 'Panchayath', icon: Home },
+    { value: 'municipality', label: 'Municipality', icon: Building },
+    { value: 'corporation', label: 'Corporation', icon: Landmark }
+  ];
 
   const { user, logout } = useAuth();
 
-
-const handleLogout = async () => {
+  const handleLogout = async () => {
     if (window.confirm('Are you sure you want to logout?')) {
       try {
         await logout();
@@ -67,23 +77,15 @@ const handleLogout = async () => {
     }
   };
 
+  const handleViewDetails = (registration) => {
+    setSelectedRegistration(registration);
+    setShowViewModal(true);
+  };
 
-
-//modal states
-// Add these to your state declarations
-const [showViewModal, setShowViewModal] = useState(false);
-const [selectedRegistration, setSelectedRegistration] = useState(null);
-
-const handleViewDetails = (registration) => {
-  setSelectedRegistration(registration);
-  setShowViewModal(true);
-};
-
-const closeViewModal = () => {
-  setShowViewModal(false);
-  setSelectedRegistration(null);
-};
-
+  const closeViewModal = () => {
+    setShowViewModal(false);
+    setSelectedRegistration(null);
+  };
 
   // Fetch registrations from Supabase
   useEffect(() => {
@@ -93,7 +95,7 @@ const closeViewModal = () => {
   // Apply filters whenever filter states change
   useEffect(() => {
     applyFilters();
-  }, [registrations, searchTerm, selectedDistrict, dateRange]);
+  }, [registrations, searchTerm, selectedDistrict, selectedLocalBodyType, dateRange]);
 
   const fetchRegistrations = async () => {
     setLoading(true);
@@ -137,6 +139,7 @@ const closeViewModal = () => {
         reg.last_name?.toLowerCase().includes(searchLower) ||
         reg.district?.toLowerCase().includes(searchLower) ||
         reg.local_body?.toLowerCase().includes(searchLower) ||
+        reg.local_body_type?.toLowerCase().includes(searchLower) ||
         reg.phone_number?.includes(searchTerm) ||
         reg.whatsapp_number?.includes(searchTerm)
       );
@@ -145,6 +148,11 @@ const closeViewModal = () => {
     // District filter
     if (selectedDistrict) {
       filtered = filtered.filter(reg => reg.district === selectedDistrict);
+    }
+
+    // Local Body Type filter
+    if (selectedLocalBodyType) {
+      filtered = filtered.filter(reg => reg.local_body_type === selectedLocalBodyType);
     }
 
     // Date range filter
@@ -162,11 +170,18 @@ const closeViewModal = () => {
     setFilteredData(filtered);
   };
 
-  // Stats calculations
+  // Enhanced stats calculations
   const calculateStats = () => {
     const today = new Date().toDateString();
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
+
+    // Local Body Type breakdown
+    const typeBreakdown = registrations.reduce((acc, reg) => {
+      const type = reg.local_body_type || 'unknown';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
 
     return {
       total: registrations.length,
@@ -176,7 +191,10 @@ const closeViewModal = () => {
       districts: [...new Set(registrations.map(reg => reg.district))].length,
       thisWeek: registrations.filter(reg => 
         new Date(reg.created_at) > weekAgo
-      ).length
+      ).length,
+      panchayaths: typeBreakdown.panchayath || 0,
+      municipalities: typeBreakdown.municipality || 0,
+      corporations: typeBreakdown.corporation || 0
     };
   };
 
@@ -189,13 +207,14 @@ const closeViewModal = () => {
     setRefreshing(false);
   };
 
-  // Handle export
+  // Enhanced export with local body type
   const handleExport = () => {
     const csvContent = [
-      ['Name', 'District', 'Local Body', 'Phone', 'WhatsApp', 'Date'],
+      ['Name', 'District', 'Local Body Type', 'Local Body', 'Phone', 'WhatsApp', 'Date'],
       ...filteredData.map(reg => [
         `${reg.first_name} ${reg.last_name}`,
         reg.district,
+        reg.local_body_type || '',
         reg.local_body,
         reg.phone_number,
         reg.whatsapp_number,
@@ -266,6 +285,16 @@ const closeViewModal = () => {
     }
   };
 
+  const getLocalBodyTypeIcon = (type) => {
+    const typeData = localBodyTypes.find(t => t.value === type);
+    return typeData ? typeData.icon : Home;
+  };
+
+  const getLocalBodyTypeLabel = (type) => {
+    const typeData = localBodyTypes.find(t => t.value === type);
+    return typeData ? typeData.label : type;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-800 to-black">
       {/* Background Elements */}
@@ -285,17 +314,17 @@ const closeViewModal = () => {
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
                 <h1 className="text-3xl sm:text-4xl font-black text-white">
-                  Admin Dashboard
+                  Enhanced Admin Dashboard
                 </h1>
                 <Bell className="w-6 h-6 text-yellow-400" />
               </div>
               <p className="text-white/70 text-lg">
-                Manage painter protection policy registrations
+                Manage painter protection policy registrations with local body details
               </p>
               <div className="flex items-center space-x-4 mt-2">
                 <span className="text-white/50 text-sm">
-    Welcome back, {user?.email || 'Admin User'}
-  </span>
+                  Welcome back, {user?.email || 'Admin User'}
+                </span>
                 <span className="w-1 h-1 bg-white/30 rounded-full"></span>
                 <span className="text-white/50 text-sm">
                   {new Date().toLocaleDateString('en-IN', { 
@@ -335,13 +364,13 @@ const closeViewModal = () => {
                 <span className="hidden sm:block">Export</span>
               </button>
 
-               <button 
-    onClick={handleLogout}
-    className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all duration-300 group"
-  >
-    <LogOut className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" />
-    <span className="hidden sm:block">Logout</span>
-  </button>
+              <button 
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 hover:bg-red-500/30 hover:text-red-300 transition-all duration-300 group"
+              >
+                <LogOut className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" />
+                <span className="hidden sm:block">Logout</span>
+              </button>
             </div>
           </div>
 
@@ -355,13 +384,13 @@ const closeViewModal = () => {
               <span>Last updated: {new Date().toLocaleTimeString()}</span>
             </div>
             <div className="text-white/50">
-              <span>Kerala Painters Admin Panel v1.0</span>
+              <span>Kerala Painters Admin Panel v2.0</span>
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Enhanced Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
           {[
             {
               title: 'Total Registrations',
@@ -369,7 +398,8 @@ const closeViewModal = () => {
               icon: Users,
               color: 'blue',
               change: '+12%',
-              description: 'All time registrations'
+              description: 'All time registrations',
+              span: 'xl:col-span-2'
             },
             {
               title: 'Today',
@@ -380,12 +410,12 @@ const closeViewModal = () => {
               description: 'New registrations today'
             },
             {
-              title: 'Districts Covered',
+              title: 'Districts',
               value: stats.districts,
               icon: MapPin,
               color: 'purple',
               change: `${stats.districts}/14`,
-              description: 'Kerala districts covered'
+              description: 'Districts covered'
             },
             {
               title: 'This Week',
@@ -394,18 +424,42 @@ const closeViewModal = () => {
               color: 'orange',
               change: '+18%',
               description: 'Weekly registrations'
+            },
+            {
+              title: 'Panchayaths',
+              value: stats.panchayaths,
+              icon: Home,
+              color: 'green',
+              change: `${((stats.panchayaths/stats.total)*100).toFixed(1)}%`,
+              description: 'Panchayath registrations'
+            },
+            {
+              title: 'Municipalities',
+              value: stats.municipalities,
+              icon: Building,
+              color: 'indigo',
+              change: `${((stats.municipalities/stats.total)*100).toFixed(1)}%`,
+              description: 'Municipality registrations'
+            },
+            {
+              title: 'Corporations',
+              value: stats.corporations,
+              icon: Landmark,
+              color: 'red',
+              change: `${((stats.corporations/stats.total)*100).toFixed(1)}%`,
+              description: 'Corporation registrations'
             }
           ].map((stat, index) => (
             <div
               key={index}
-              className="group relative bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 hover:bg-white/10 transition-all duration-300 hover:scale-105"
+              className={`group relative bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-4 hover:bg-white/10 transition-all duration-300 hover:scale-105 ${stat.span || ''}`}
             >
               <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               
               <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 bg-${stat.color}-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                    <stat.icon className={`w-6 h-6 text-${stat.color}-400`} />
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`w-10 h-10 bg-${stat.color}-500/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
+                    <stat.icon className={`w-5 h-5 text-${stat.color}-400`} />
                   </div>
                   <div className="text-right">
                     <span className={`text-sm font-medium ${
@@ -421,7 +475,7 @@ const closeViewModal = () => {
                 </div>
 
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-1 group-hover:text-blue-100 transition-colors duration-300">
+                  <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-100 transition-colors duration-300">
                     {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
                   </h3>
                   <p className="text-white/60 text-sm font-medium mb-1">
@@ -432,13 +486,11 @@ const closeViewModal = () => {
                   </p>
                 </div>
               </div>
-
-              <div className={`absolute top-2 right-2 w-8 h-8 bg-${stat.color}-400/10 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300`}></div>
             </div>
           ))}
         </div>
 
-        {/* Filters and Search Section */}
+        {/* Enhanced Filters and Search Section */}
         <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 mb-6">
           <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
             
@@ -462,7 +514,7 @@ const closeViewModal = () => {
               >
                 <Filter className="w-4 h-4" />
                 <span>Filters</span>
-                {(selectedDistrict || dateRange.start) && (
+                {(selectedDistrict || selectedLocalBodyType || dateRange.start) && (
                   <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
                 )}
               </button>
@@ -485,7 +537,7 @@ const closeViewModal = () => {
 
           {/* Expandable Filters */}
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-white/80 text-sm font-medium mb-2">District</label>
                 <select
@@ -497,6 +549,22 @@ const closeViewModal = () => {
                   {districts.map(district => (
                     <option key={district} value={district} className="bg-gray-800">
                       {district}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-white/80 text-sm font-medium mb-2">Local Body Type</label>
+                <select
+                  value={selectedLocalBodyType}
+                  onChange={(e) => setSelectedLocalBodyType(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="" className="bg-gray-800">All Types</option>
+                  {localBodyTypes.map(type => (
+                    <option key={type.value} value={type.value} className="bg-gray-800">
+                      {type.label}
                     </option>
                   ))}
                 </select>
@@ -525,7 +593,7 @@ const closeViewModal = () => {
           )}
         </div>
 
-        {/* Table Container */}
+        {/* Enhanced Table Container */}
         <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-white">
@@ -546,7 +614,7 @@ const closeViewModal = () => {
             </div>
           </div>
 
-          {/* Table */}
+          {/* Enhanced Table */}
           {loading ? (
             <div className="text-center py-12">
               <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
@@ -583,6 +651,7 @@ const closeViewModal = () => {
                     {[
                       { key: 'first_name', label: 'Name' },
                       { key: 'district', label: 'District' },
+                      { key: 'local_body_type', label: 'Type' },
                       { key: 'local_body', label: 'Local Body' },
                       { key: 'phone_number', label: 'Phone' },
                       { key: 'created_at', label: 'Date' }
@@ -606,41 +675,54 @@ const closeViewModal = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((registration) => (
-                    <tr key={registration.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="py-3 px-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedRows.includes(registration.id)}
-                          onChange={() => handleRowSelect(registration.id)}
-                          className="w-4 h-4 text-blue-500 bg-white/10 border-white/20 rounded focus:ring-blue-400"
-                        />
-                      </td>
-                      <td className="py-3 px-4 text-white">
-                        {registration.first_name} {registration.last_name}
-                      </td>
-                      <td className="py-3 px-4 text-white/80">
-                        {registration.district}
-                      </td>
-                      <td className="py-3 px-4 text-white/80">
-                        {registration.local_body}
-                      </td>
-                      <td className="py-3 px-4 text-white/80">
-                        {registration.phone_number}
-                      </td>
-                      <td className="py-3 px-4 text-white/80">
-                        {new Date(registration.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <button 
-  onClick={() => handleViewDetails(registration)}
-  className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-blue-400 hover:bg-blue-500/30 transition-colors text-sm"
->
-  View
-</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredData.map((registration) => {
+                    const LocalBodyIcon = getLocalBodyTypeIcon(registration.local_body_type);
+                    return (
+                      <tr key={registration.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-3 px-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.includes(registration.id)}
+                            onChange={() => handleRowSelect(registration.id)}
+                            className="w-4 h-4 text-blue-500 bg-white/10 border-white/20 rounded focus:ring-blue-400"
+                          />
+                        </td>
+                        <td className="py-3 px-4 text-white">
+                          {registration.first_name} {registration.last_name}
+                        </td>
+                        <td className="py-3 px-4 text-white/80">
+                          {registration.district}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center space-x-2">
+                            <LocalBodyIcon className="w-4 h-4 text-blue-300" />
+                            <span className="text-white/80 text-sm">
+                              {getLocalBodyTypeLabel(registration.local_body_type)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-white/80">
+                          <span className="truncate max-w-32 block" title={registration.local_body}>
+                            {registration.local_body}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-white/80">
+                          {registration.phone_number}
+                        </td>
+                        <td className="py-3 px-4 text-white/80">
+                          {new Date(registration.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <button 
+                            onClick={() => handleViewDetails(registration)}
+                            className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 rounded text-blue-400 hover:bg-blue-500/30 transition-colors text-sm"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -690,20 +772,18 @@ const closeViewModal = () => {
         </div>
       </div>
 
-
       {/* View Details Modal */}
-
-<ViewDetailsModal 
-  isOpen={showViewModal}
-  onClose={closeViewModal}
-  registration={selectedRegistration}
-  onUpdate={(updatedData) => {
-    // Refresh the data after edit
-    fetchRegistrations();
-  }}
-/>
+      <ViewDetailsModal 
+        isOpen={showViewModal}
+        onClose={closeViewModal}
+        registration={selectedRegistration}
+        onUpdate={(updatedData) => {
+          // Refresh the data after edit
+          fetchRegistrations();
+        }}
+      />
     </div>
   );
 };
 
-export default AdminDashboard
+export default EnhancedAdminDashboard;
