@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add this to your global CSS file (e.g., globals.css or index.css) */
+
+/* Header spacing utility class */
+.page-content {
+  padding-top: 6rem; /* 96px for mobile */
+}
+
+/* Responsive padding for larger screens */
+@media (min-width: 768px) {
+  .page-content {
+    padding-top: 7rem; /* 112px for desktop */
+  }
+}
+
+/* Alternative: If you prefer Tailwind-style naming */
+.header-spacing {
+  padding-top: 6rem;
+}
+
+@media (min-width: 768px) {
+  .header-spacing {
+    padding-top: 7rem;
+  }
+}
+
+/* For full-height hero sections that need to appear centered */
+.hero-spacing {
+  padding-top: 6rem;
+  margin-top: -6rem;
+}
+
+@media (min-width: 768px) {
+  .hero-spacing {
+    padding-top: 7rem;
+    margin-top: -7rem;
+  }
+}
