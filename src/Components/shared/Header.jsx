@@ -20,9 +20,9 @@ const Header = () => {
   // Navigation items with routes
   const navItems = [
     { name: 'Home', path: '/' },
-    { name: 'About', path: '/about' },
-    { name: 'Policy Details', path: '/policy-details' },
-    { name: 'Contact', path: '/contact' }
+    { name: 'About', path: '/' },
+    { name: 'Policy Details', path: '/' },
+    { name: 'Contact', path: '/' }
   ];
 
   // Check if current path matches the nav item
