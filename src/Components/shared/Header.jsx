@@ -149,7 +149,7 @@ const Header = () => {
             {/* Mobile CTA Button */}
             <div className="pt-4">
               <Link 
-                to="/apply"
+                to="/registration"
                 onClick={() => setIsMenuOpen(false)}
                 className="block w-full group relative overflow-hidden px-6 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-semibold text-sm rounded-xl shadow-lg hover:shadow-blue-500/25 transform transition-all duration-300 hover:scale-105 text-center"
                 style={{ 
