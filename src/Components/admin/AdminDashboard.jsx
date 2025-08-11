@@ -16,12 +16,15 @@ import {
   ChevronRight,
   Building,
   Home,
-  Landmark
+  Landmark,
+  Mail,
+  CakeIcon,
+  Pin
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import ViewDetailsModal from './ViewDetailsModal';
 
-const EnhancedAdminDashboard = () => {
+const CompleteEnhancedAdminDashboard = () => {
   // Main state management
   const [registrations, setRegistrations] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -32,6 +35,7 @@ const EnhancedAdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedLocalBodyType, setSelectedLocalBodyType] = useState('');
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   
   // Pagination states
@@ -65,6 +69,15 @@ const EnhancedAdminDashboard = () => {
     { value: 'corporation', label: 'Corporation', icon: Landmark }
   ];
 
+  const ageGroups = [
+    { value: '18-25', label: '18-25 years' },
+    { value: '26-35', label: '26-35 years' },
+    { value: '36-45', label: '36-45 years' },
+    { value: '46-55', label: '46-55 years' },
+    { value: '56-65', label: '56-65 years' },
+    { value: '65+', label: '65+ years' }
+  ];
+
   const { user, logout } = useAuth();
 
   const handleLogout = async () => {
@@ -87,6 +100,32 @@ const EnhancedAdminDashboard = () => {
     setSelectedRegistration(null);
   };
 
+  // Calculate age from date of birth
+  const calculateAge = (dateOfBirth) => {
+    if (!dateOfBirth) return null;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
+  // Get age group from age
+  const getAgeGroup = (age) => {
+    if (age >= 18 && age <= 25) return '18-25';
+    if (age >= 26 && age <= 35) return '26-35';
+    if (age >= 36 && age <= 45) return '36-45';
+    if (age >= 46 && age <= 55) return '46-55';
+    if (age >= 56 && age <= 65) return '56-65';
+    if (age > 65) return '65+';
+    return 'Unknown';
+  };
+
   // Fetch registrations from Supabase
   useEffect(() => {
     fetchRegistrations();
@@ -95,7 +134,7 @@ const EnhancedAdminDashboard = () => {
   // Apply filters whenever filter states change
   useEffect(() => {
     applyFilters();
-  }, [registrations, searchTerm, selectedDistrict, selectedLocalBodyType, dateRange]);
+  }, [registrations, searchTerm, selectedDistrict, selectedLocalBodyType, selectedAgeGroup, dateRange]);
 
   const fetchRegistrations = async () => {
     setLoading(true);
@@ -106,7 +145,7 @@ const EnhancedAdminDashboard = () => {
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
-      // Build Supabase query
+      // Build Supabase query with all new fields
       let query = supabase
         .from('registrations')
         .select('*', { count: 'exact' })
@@ -131,7 +170,7 @@ const EnhancedAdminDashboard = () => {
   const applyFilters = () => {
     let filtered = [...registrations];
 
-    // Search filter
+    // Search filter - enhanced to include new fields
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(reg => 
@@ -140,6 +179,10 @@ const EnhancedAdminDashboard = () => {
         reg.district?.toLowerCase().includes(searchLower) ||
         reg.local_body?.toLowerCase().includes(searchLower) ||
         reg.local_body_type?.toLowerCase().includes(searchLower) ||
+        reg.house_name_number?.toLowerCase().includes(searchLower) ||
+        reg.place?.toLowerCase().includes(searchLower) ||
+        reg.post_office?.toLowerCase().includes(searchLower) ||
+        reg.pincode?.includes(searchTerm) ||
         reg.phone_number?.includes(searchTerm) ||
         reg.whatsapp_number?.includes(searchTerm)
       );
@@ -153,6 +196,14 @@ const EnhancedAdminDashboard = () => {
     // Local Body Type filter
     if (selectedLocalBodyType) {
       filtered = filtered.filter(reg => reg.local_body_type === selectedLocalBodyType);
+    }
+
+    // Age Group filter
+    if (selectedAgeGroup) {
+      filtered = filtered.filter(reg => {
+        const age = calculateAge(reg.date_of_birth);
+        return getAgeGroup(age) === selectedAgeGroup;
+      });
     }
 
     // Date range filter
@@ -183,6 +234,17 @@ const EnhancedAdminDashboard = () => {
       return acc;
     }, {});
 
+    // Age statistics
+    const ages = registrations
+      .filter(reg => reg.date_of_birth)
+      .map(reg => calculateAge(reg.date_of_birth))
+      .filter(age => age !== null);
+
+    const avgAge = ages.length > 0 ? Math.round(ages.reduce((sum, age) => sum + age, 0) / ages.length) : 0;
+
+    // PIN code analysis
+    const uniquePincodes = [...new Set(registrations.map(reg => reg.pincode).filter(Boolean))];
+
     return {
       total: registrations.length,
       today: registrations.filter(reg => 
@@ -194,7 +256,9 @@ const EnhancedAdminDashboard = () => {
       ).length,
       panchayaths: typeBreakdown.panchayath || 0,
       municipalities: typeBreakdown.municipality || 0,
-      corporations: typeBreakdown.corporation || 0
+      corporations: typeBreakdown.corporation || 0,
+      avgAge: avgAge,
+      uniquePincodes: uniquePincodes.length
     };
   };
 
@@ -207,17 +271,27 @@ const EnhancedAdminDashboard = () => {
     setRefreshing(false);
   };
 
-  // Enhanced export with local body type
+  // Enhanced export with all new fields
   const handleExport = () => {
     const csvContent = [
-      ['Name', 'District', 'Local Body Type', 'Local Body', 'Phone', 'WhatsApp', 'Date'],
+      [
+        'Name', 'Age', 'Date of Birth', 'House/No', 'Place', 'Post Office', 
+        'PIN Code', 'District', 'Local Body Type', 'Local Body', 
+        'Phone', 'WhatsApp', 'Registration Date'
+      ],
       ...filteredData.map(reg => [
         `${reg.first_name} ${reg.last_name}`,
-        reg.district,
+        calculateAge(reg.date_of_birth) || '',
+        reg.date_of_birth || '',
+        reg.house_name_number || '',
+        reg.place || '',
+        reg.post_office || '',
+        reg.pincode || '',
+        reg.district || '',
         reg.local_body_type || '',
-        reg.local_body,
-        reg.phone_number,
-        reg.whatsapp_number,
+        reg.local_body || '',
+        reg.phone_number || '',
+        reg.whatsapp_number || '',
         new Date(reg.created_at).toLocaleDateString()
       ])
     ].map(row => row.join(',')).join('\n');
@@ -226,7 +300,7 @@ const EnhancedAdminDashboard = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `registrations-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `detailed-registrations-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -314,12 +388,12 @@ const EnhancedAdminDashboard = () => {
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
                 <h1 className="text-3xl sm:text-4xl font-black text-white">
-                  Enhanced Admin Dashboard
+                  Complete Registration Dashboard
                 </h1>
                 <Bell className="w-6 h-6 text-yellow-400" />
               </div>
               <p className="text-white/70 text-lg">
-                Manage painter protection policy registrations with local body details
+                Comprehensive management with personal & address details
               </p>
               <div className="flex items-center space-x-4 mt-2">
                 <span className="text-white/50 text-sm">
@@ -390,7 +464,7 @@ const EnhancedAdminDashboard = () => {
         </div>
 
         {/* Enhanced Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-9 gap-4 mb-8">
           {[
             {
               title: 'Total Registrations',
@@ -418,12 +492,20 @@ const EnhancedAdminDashboard = () => {
               description: 'Districts covered'
             },
             {
-              title: 'This Week',
-              value: stats.thisWeek,
-              icon: TrendingUp,
-              color: 'orange',
-              change: '+18%',
-              description: 'Weekly registrations'
+              title: 'Average Age',
+              value: `${stats.avgAge}y`,
+              icon: CakeIcon,
+              color: 'pink',
+              change: 'Avg',
+              description: 'Average applicant age'
+            },
+            {
+              title: 'PIN Codes',
+              value: stats.uniquePincodes,
+              icon: Pin,
+              color: 'yellow',
+              change: 'Unique',
+              description: 'Different PIN codes'
             },
             {
               title: 'Panchayaths',
@@ -448,6 +530,14 @@ const EnhancedAdminDashboard = () => {
               color: 'red',
               change: `${((stats.corporations/stats.total)*100).toFixed(1)}%`,
               description: 'Corporation registrations'
+            },
+            {
+              title: 'This Week',
+              value: stats.thisWeek,
+              icon: TrendingUp,
+              color: 'orange',
+              change: '+18%',
+              description: 'Weekly registrations'
             }
           ].map((stat, index) => (
             <div
@@ -499,7 +589,7 @@ const EnhancedAdminDashboard = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50" />
               <input
                 type="text"
-                placeholder="Search registrations..."
+                placeholder="Search name, address, PIN, phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
@@ -514,7 +604,7 @@ const EnhancedAdminDashboard = () => {
               >
                 <Filter className="w-4 h-4" />
                 <span>Filters</span>
-                {(selectedDistrict || selectedLocalBodyType || dateRange.start) && (
+                {(selectedDistrict || selectedLocalBodyType || selectedAgeGroup || dateRange.start) && (
                   <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
                 )}
               </button>
@@ -537,7 +627,7 @@ const EnhancedAdminDashboard = () => {
 
           {/* Expandable Filters */}
           {showFilters && (
-            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
                 <label className="block text-white/80 text-sm font-medium mb-2">District</label>
                 <select
@@ -565,6 +655,22 @@ const EnhancedAdminDashboard = () => {
                   {localBodyTypes.map(type => (
                     <option key={type.value} value={type.value} className="bg-gray-800">
                       {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-white/80 text-sm font-medium mb-2">Age Group</label>
+                <select
+                  value={selectedAgeGroup}
+                  onChange={(e) => setSelectedAgeGroup(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="" className="bg-gray-800">All Ages</option>
+                  {ageGroups.map(group => (
+                    <option key={group.value} value={group.value} className="bg-gray-800">
+                      {group.label}
                     </option>
                   ))}
                 </select>
@@ -597,7 +703,7 @@ const EnhancedAdminDashboard = () => {
         <div className="bg-white/5 backdrop-blur-lg rounded-2xl border border-white/10 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-white">
-              Registrations ({filteredData.length})
+              Detailed Registrations ({filteredData.length})
             </h3>
             <div className="flex items-center space-x-2">
               <span className="text-white/60 text-sm">Show</span>
@@ -650,9 +756,11 @@ const EnhancedAdminDashboard = () => {
                     </th>
                     {[
                       { key: 'first_name', label: 'Name' },
+                      { key: 'date_of_birth', label: 'Age' },
+                      { key: 'place', label: 'Place' },
+                      { key: 'pincode', label: 'PIN' },
                       { key: 'district', label: 'District' },
                       { key: 'local_body_type', label: 'Type' },
-                      { key: 'local_body', label: 'Local Body' },
                       { key: 'phone_number', label: 'Phone' },
                       { key: 'created_at', label: 'Date' }
                     ].map(column => (
@@ -677,6 +785,7 @@ const EnhancedAdminDashboard = () => {
                 <tbody>
                   {filteredData.map((registration) => {
                     const LocalBodyIcon = getLocalBodyTypeIcon(registration.local_body_type);
+                    const age = calculateAge(registration.date_of_birth);
                     return (
                       <tr key={registration.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                         <td className="py-3 px-4">
@@ -687,8 +796,43 @@ const EnhancedAdminDashboard = () => {
                             className="w-4 h-4 text-blue-500 bg-white/10 border-white/20 rounded focus:ring-blue-400"
                           />
                         </td>
-                        <td className="py-3 px-4 text-white">
-                          {registration.first_name} {registration.last_name}
+                        <td className="py-3 px-4">
+                          <div className="text-white font-medium">
+                            {registration.first_name} {registration.last_name}
+                          </div>
+                          <div className="text-white/60 text-sm">
+                            {registration.house_name_number && (
+                              <span className="truncate max-w-32 block" title={registration.house_name_number}>
+                                {registration.house_name_number}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {age ? (
+                            <div className="flex items-center space-x-2">
+                              <CakeIcon className="w-4 h-4 text-pink-300" />
+                              <span className="text-white font-medium">{age}y</span>
+                            </div>
+                          ) : (
+                            <span className="text-white/40 text-sm">N/A</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="text-white/80">
+                            {registration.place || 'N/A'}
+                          </div>
+                          <div className="text-white/50 text-sm">
+                            {registration.post_office || ''}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center space-x-2">
+                            <Pin className="w-4 h-4 text-cyan-300" />
+                            <span className="text-white/80 font-mono">
+                              {registration.pincode || 'N/A'}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-white/80">
                           {registration.district}
@@ -701,13 +845,13 @@ const EnhancedAdminDashboard = () => {
                             </span>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-white/80">
-                          <span className="truncate max-w-32 block" title={registration.local_body}>
-                            {registration.local_body}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-white/80">
-                          {registration.phone_number}
+                        <td className="py-3 px-4">
+                          <div className="text-white/80">
+                            {registration.phone_number}
+                          </div>
+                          <div className="text-white/50 text-sm">
+                            {registration.whatsapp_number}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-white/80">
                           {new Date(registration.created_at).toLocaleDateString()}
@@ -786,4 +930,4 @@ const EnhancedAdminDashboard = () => {
   );
 };
 
-export default EnhancedAdminDashboard;
+export default CompleteEnhancedAdminDashboard;
