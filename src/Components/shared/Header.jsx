@@ -88,7 +88,7 @@ const Header = () => {
           {/* CTA Button for Desktop */}
           <div className="hidden md:flex">
             <Link 
-              to="/apply"
+              to="/registration"
               className="group relative overflow-hidden px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-semibold text-sm rounded-xl shadow-lg hover:shadow-blue-500/25 transform transition-all duration-300 hover:scale-105 inline-block"
             >
               <span className="relative z-10">Apply For Insurance</span>
