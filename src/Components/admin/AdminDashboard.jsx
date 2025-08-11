@@ -388,7 +388,7 @@ const CompleteEnhancedAdminDashboard = () => {
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
                 <h1 className="text-3xl sm:text-4xl font-black text-white">
-                  Complete Registration Dashboard
+                  Keralapainters.com - Admin DB
                 </h1>
                 <Bell className="w-6 h-6 text-yellow-400" />
               </div>
