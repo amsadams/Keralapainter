@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { User, MapPin, Phone, MessageCircle, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
+import { 
+  User, 
+  MapPin, 
+  Phone, 
+  MessageCircle, 
+  ArrowRight, 
+  CheckCircle, 
+  AlertCircle,
+  Calendar,
+  Home,
+  Mail
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { KERALA_LOCAL_BODIES } from '../../data/keralaLocalBodies'; // Import the data
 
@@ -7,6 +18,11 @@ const RegistrationForm = () => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    dateOfBirth: '',
+    houseNameNumber: '',
+    place: '',
+    postOffice: '',
+    pincode: '',
     district: '',
     localBodyType: '', // 'panchayath', 'municipality', 'corporation'
     localBody: '',
@@ -43,12 +59,46 @@ const RegistrationForm = () => {
   };
 
   const validateForm = () => {
-    const { firstName, lastName, district, localBodyType, localBody, phoneNumber, whatsappNumber } = formData;
+    const { 
+      firstName, 
+      lastName, 
+      dateOfBirth,
+      houseNameNumber,
+      place,
+      postOffice,
+      pincode,
+      district, 
+      localBodyType, 
+      localBody, 
+      phoneNumber, 
+      whatsappNumber 
+    } = formData;
     
-    if (!firstName.trim() || !lastName.trim() || !district || !localBodyType || !localBody.trim() || !phoneNumber.trim() || !whatsappNumber.trim()) {
+    // Check required fields
+    if (!firstName.trim() || !lastName.trim() || !dateOfBirth || !houseNameNumber.trim() || 
+        !place.trim() || !postOffice.trim() || !pincode.trim() || !district || 
+        !localBodyType || !localBody.trim() || !phoneNumber.trim() || !whatsappNumber.trim()) {
       return 'All fields are required';
     }
     
+    // Validate date of birth (should be at least 18 years old)
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    
+    if (age < 18 || (age === 18 && monthDiff < 0) || 
+        (age === 18 && monthDiff === 0 && today.getDate() < dob.getDate())) {
+      return 'Applicant must be at least 18 years old';
+    }
+    
+    // Validate PIN code
+    const pincodeRegex = /^[0-9]{6}$/;
+    if (!pincodeRegex.test(pincode)) {
+      return 'PIN code must be exactly 6 digits';
+    }
+    
+    // Validate phone numbers
     const phoneRegex = /^[0-9]{10}$/;
     if (!phoneRegex.test(phoneNumber)) {
       return 'Phone number must be 10 digits';
@@ -82,6 +132,11 @@ const RegistrationForm = () => {
           {
             first_name: formData.firstName.trim(),
             last_name: formData.lastName.trim(),
+            date_of_birth: formData.dateOfBirth,
+            house_name_number: formData.houseNameNumber.trim(),
+            place: formData.place.trim(),
+            post_office: formData.postOffice.trim(),
+            pincode: formData.pincode.trim(),
             district: formData.district,
             local_body_type: formData.localBodyType,
             local_body: formData.localBody.trim(),
@@ -102,6 +157,11 @@ const RegistrationForm = () => {
       setFormData({
         firstName: '',
         lastName: '',
+        dateOfBirth: '',
+        houseNameNumber: '',
+        place: '',
+        postOffice: '',
+        pincode: '',
         district: '',
         localBodyType: '',
         localBody: '',
@@ -152,8 +212,22 @@ const RegistrationForm = () => {
     }
   };
 
+  // Calculate max date (18 years ago from today)
+  const getMaxDate = () => {
+    const today = new Date();
+    const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
+    return maxDate.toISOString().split('T')[0];
+  };
+
+  // Calculate min date (reasonable minimum age of 80 years ago)
+  const getMinDate = () => {
+    const today = new Date();
+    const minDate = new Date(today.getFullYear() - 80, today.getMonth(), today.getDate());
+    return minDate.toISOString().split('T')[0];
+  };
+
   return (
-    <div className="relative bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 p-8 sm:p-12 shadow-2xl max-w-2xl mx-auto">
+    <div className="relative bg-white/5 backdrop-blur-lg rounded-3xl border border-white/10 p-8 sm:p-12 shadow-2xl max-w-4xl mx-auto">
       {/* Inner Glow */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-blue-500/10 rounded-3xl"></div>
       
@@ -164,7 +238,7 @@ const RegistrationForm = () => {
             <User className="w-8 h-8 text-blue-300 mr-3" />
             <h3 className="text-3xl font-bold text-white">Registration Form</h3>
           </div>
-          <p className="text-white/70 text-lg">Fill in your details to apply for protection policy</p>
+          <p className="text-white/70 text-lg">Fill in your complete details to apply for protection policy</p>
         </div>
 
         {/* Status Messages */}
@@ -183,151 +257,261 @@ const RegistrationForm = () => {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">First Name *</label>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                required
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-                placeholder="Enter first name"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          
+          {/* Personal Information Section */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+            <h4 className="text-xl font-semibold text-white mb-6 flex items-center">
+              <User className="w-5 h-5 text-emerald-400 mr-2" />
+              Personal Information
+            </h4>
             
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">Last Name *</label>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                required
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-                placeholder="Enter last name"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-white/80 text-sm font-medium mb-2">First Name *</label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="Enter first name"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white/80 text-sm font-medium mb-2">Last Name *</label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="Enter last name"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="flex items-center text-white/80 text-sm font-medium mb-2">
+                  <Calendar className="w-4 h-4 text-purple-300 mr-2" />
+                  Date of Birth *
+                </label>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  min={getMinDate()}
+                  max={getMaxDate()}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                />
+                <p className="text-white/50 text-xs mt-1">Must be at least 18 years old</p>
+              </div>
             </div>
           </div>
 
-          {/* District Selection */}
-          <div>
-            <label className="flex items-center text-white/80 text-sm font-medium mb-2">
-              <MapPin className="w-4 h-4 text-emerald-300 mr-2" />
-              District *
-            </label>
-            <select
-              name="district"
-              value={formData.district}
-              onChange={handleInputChange}
-              required
-              disabled={isSubmitting}
-              className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-            >
-              <option value="" className="bg-gray-800 text-white">Select District</option>
-              {districts.map((district) => (
-                <option key={district} value={district} className="bg-gray-800 text-white">
-                  {district}
-                </option>
-              ))}
-            </select>
+          {/* Address Information Section */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+            <h4 className="text-xl font-semibold text-white mb-6 flex items-center">
+              <Home className="w-5 h-5 text-orange-400 mr-2" />
+              Address Information
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-white/80 text-sm font-medium mb-2">House Name/Number *</label>
+                <input
+                  type="text"
+                  name="houseNameNumber"
+                  value={formData.houseNameNumber}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="Enter house name or number"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-white/80 text-sm font-medium mb-2">Place *</label>
+                <input
+                  type="text"
+                  name="place"
+                  value={formData.place}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="Enter place/locality"
+                />
+              </div>
+              
+              <div>
+                <label className="flex items-center text-white/80 text-sm font-medium mb-2">
+                  <Mail className="w-4 h-4 text-cyan-300 mr-2" />
+                  Post Office *
+                </label>
+                <input
+                  type="text"
+                  name="postOffice"
+                  value={formData.postOffice}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="Enter post office"
+                />
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="block text-white/80 text-sm font-medium mb-2">PIN Code *</label>
+                <input
+                  type="text"
+                  name="pincode"
+                  value={formData.pincode}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  pattern="[0-9]{6}"
+                  maxLength="6"
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="Enter 6-digit PIN code"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Local Body Type Selection */}
-          {formData.district && (
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">
-                Local Body Type *
-              </label>
-              <select
-                name="localBodyType"
-                value={formData.localBodyType}
-                onChange={handleInputChange}
-                required
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-              >
-                <option value="" className="bg-gray-800 text-white">Select Local Body Type</option>
-                {getAvailableLocalBodyTypes().map((type) => (
-                  <option key={type.value} value={type.value} className="bg-gray-800 text-white">
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Local Body Selection */}
-          {formData.district && formData.localBodyType && (
-            <div>
-              <label className="block text-white/80 text-sm font-medium mb-2">
-                {formData.localBodyType === 'panchayath' ? 'Panchayath' : 
-                 formData.localBodyType === 'municipality' ? 'Municipality' : 'Corporation'} *
-              </label>
-              <select
-                name="localBody"
-                value={formData.localBody}
-                onChange={handleInputChange}
-                required
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-              >
-                <option value="" className="bg-gray-800 text-white">
-                  Select {formData.localBodyType === 'panchayath' ? 'Panchayath' : 
-                           formData.localBodyType === 'municipality' ? 'Municipality' : 'Corporation'}
-                </option>
-                {getAvailableLocalBodies().map((localBody) => (
-                  <option key={localBody} value={localBody} className="bg-gray-800 text-white">
-                    {localBody}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Contact Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="flex items-center text-white/80 text-sm font-medium mb-2">
-                <Phone className="w-4 h-4 text-blue-300 mr-2" />
-                Phone Number *
-              </label>
-              <input
-                type="tel"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                required
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-                placeholder="9876543210"
-                pattern="[0-9]{10}"
-                maxLength="10"
-              />
-            </div>
+          {/* Location Selection Section */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+            <h4 className="text-xl font-semibold text-white mb-6 flex items-center">
+              <MapPin className="w-5 h-5 text-emerald-400 mr-2" />
+              Administrative Location
+            </h4>
             
-            <div>
-              <label className="flex items-center text-white/80 text-sm font-medium mb-2">
-                <MessageCircle className="w-4 h-4 text-green-300 mr-2" />
-                WhatsApp Number *
-              </label>
-              <input
-                type="tel"
-                name="whatsappNumber"
-                value={formData.whatsappNumber}
-                onChange={handleInputChange}
-                required
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
-                placeholder="9876543210"
-                pattern="[0-9]{10}"
-                maxLength="10"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* District Selection */}
+              <div className="md:col-span-2">
+                <label className="block text-white/80 text-sm font-medium mb-2">District *</label>
+                <select
+                  name="district"
+                  value={formData.district}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                >
+                  <option value="" className="bg-gray-800 text-white">Select District</option>
+                  {districts.map((district) => (
+                    <option key={district} value={district} className="bg-gray-800 text-white">
+                      {district}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Local Body Type Selection */}
+              {formData.district && (
+                <div>
+                  <label className="block text-white/80 text-sm font-medium mb-2">Local Body Type *</label>
+                  <select
+                    name="localBodyType"
+                    value={formData.localBodyType}
+                    onChange={handleInputChange}
+                    required
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  >
+                    <option value="" className="bg-gray-800 text-white">Select Local Body Type</option>
+                    {getAvailableLocalBodyTypes().map((type) => (
+                      <option key={type.value} value={type.value} className="bg-gray-800 text-white">
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Local Body Selection */}
+              {formData.district && formData.localBodyType && (
+                <div>
+                  <label className="block text-white/80 text-sm font-medium mb-2">
+                    {formData.localBodyType === 'panchayath' ? 'Panchayath' : 
+                     formData.localBodyType === 'municipality' ? 'Municipality' : 'Corporation'} *
+                  </label>
+                  <select
+                    name="localBody"
+                    value={formData.localBody}
+                    onChange={handleInputChange}
+                    required
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  >
+                    <option value="" className="bg-gray-800 text-white">
+                      Select {formData.localBodyType === 'panchayath' ? 'Panchayath' : 
+                               formData.localBodyType === 'municipality' ? 'Municipality' : 'Corporation'}
+                    </option>
+                    {getAvailableLocalBodies().map((localBody) => (
+                      <option key={localBody} value={localBody} className="bg-gray-800 text-white">
+                        {localBody}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Contact Information Section */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6">
+            <h4 className="text-xl font-semibold text-white mb-6 flex items-center">
+              <Phone className="w-5 h-5 text-green-400 mr-2" />
+              Contact Information
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="flex items-center text-white/80 text-sm font-medium mb-2">
+                  <Phone className="w-4 h-4 text-blue-300 mr-2" />
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="9876543210"
+                  pattern="[0-9]{10}"
+                  maxLength="10"
+                />
+              </div>
+              
+              <div>
+                <label className="flex items-center text-white/80 text-sm font-medium mb-2">
+                  <MessageCircle className="w-4 h-4 text-green-300 mr-2" />
+                  WhatsApp Number *
+                </label>
+                <input
+                  type="tel"
+                  name="whatsappNumber"
+                  value={formData.whatsappNumber}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 disabled:opacity-50"
+                  placeholder="9876543210"
+                  pattern="[0-9]{10}"
+                  maxLength="10"
+                />
+              </div>
             </div>
           </div>
 
