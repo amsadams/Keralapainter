@@ -75,7 +75,7 @@ const Home = () => {
 
 
                 {/* Secondary Button */}
-                <Link to="/policy">
+                <Link to="/">
                 <button className="group relative px-10 py-5 bg-transparent border-2 border-white/30 text-white font-semibold text-lg rounded-2xl backdrop-blur-sm hover:bg-white/5 hover:border-white/50 transform transition-all duration-500 hover:scale-105 hover:-translate-y-1 flex items-center space-x-3 min-w-80 justify-center overflow-hidden">
                   <span className="relative z-10">Learn More</span>
                   <ChevronDown className="w-6 h-6 group-hover:translate-y-1 transition-transform duration-300 relative z-10" />
